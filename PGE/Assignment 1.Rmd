@@ -1,0 +1,284 @@
+---
+title: "R Assignment 1"
+author: "Kirsten Mettler"
+date: "9/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#### Set up and Messages ####
+knitr::opts_chunk$set(echo = F)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+#### end ####
+```
+
+```{r}
+#### Loading Library ####
+library(tidyverse)
+library(plotly)
+#### end ####
+```
+
+```{r, results='hide'}
+#### Reading CSVs ####
+year <- 2017:2020
+quarters <- 1:4
+type <- "Electric"
+
+pge_elec <- NULL
+
+for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_elec <- rbind(pge_elec,temp)
+
+  saveRDS(pge_elec, "pge_elec.rds")
+}
+
+year <- 2017:2020
+quarters <- 1:4
+type <- "Gas"
+
+pge_gas <- NULL
+
+for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_gas <- rbind(pge_gas,temp)
+
+  saveRDS(pge_gas, "pge_gas.rds")
+}
+#### end ####
+```
+
+```{r}
+#### Coverting kWhs and therms to kBtus ####
+pge_elec_mutate <-
+  mutate(pge_elec,
+    TOTALKBTU =
+      TOTALKWH*3.4121416331)
+
+pge_gas_mutate <-
+  mutate(pge_gas,
+    TOTALKBTU =
+      TOTALTHM*99.976)
+ #### end ####
+```
+
+```{r}
+#### Combining Data Sets ####
+pge_elec_clean <-select(
+  pge_elec_mutate,
+  ZIPCODE,
+  MONTH,
+  YEAR,
+  CUSTOMERCLASS,
+  TOTALKBTU)
+
+pge_gas_clean <-select(
+  pge_gas_mutate,
+  ZIPCODE,
+  MONTH,
+  YEAR,
+  CUSTOMERCLASS,
+  TOTALKBTU)
+ 
+pge_all <-rbind(pge_gas_clean,pge_elec_clean)
+
+pge_all_commercial <-filter(pge_all, CUSTOMERCLASS == "Gas- Commercial" | CUSTOMERCLASS == "Elec- Commercial")
+
+pge_all_residential <-filter(pge_all, CUSTOMERCLASS == "Gas- Residential" | CUSTOMERCLASS == "Elec- Residential")
+#### end ####
+```
+
+```{r}
+#### Creating Dates ####
+pge_all_commercial <- mutate(pge_all_commercial,
+    DATE = 
+      paste(
+        YEAR,
+        MONTH, 
+        "01",
+        sep="-"
+      ) %>% as.Date()
+  )
+
+pge_all_residential <- mutate(pge_all_residential,
+    DATE = 
+      paste(
+        YEAR,
+        MONTH, 
+        "01",
+        sep="-"
+      ) %>% as.Date()
+  )
+#### end ####
+```
+For this assignment, I started by creating two charts looking at gas and electricty usage as reported by PG&E from 2017 through June 2021. One examined commercial usage and the other residential.
+```{r}
+#### Charting 2017 to present commercial gas and electricity usage ####
+pge_commercial_chart <-
+  pge_all_commercial %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = DATE %>% factor(),
+      y = TOTALKBTU,
+      fill = CUSTOMERCLASS,
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Time",
+    y = "kBtu",
+    title = "PG&E Commercial Gas and Electricity Usage, 2017 to June 2021",
+    fill = "Gas or Electricity",
+  ) +
+    scale_x_discrete(guide = guide_axis(check.overlap = TRUE)
+  ) +
+    scale_fill_discrete(name = "Gas or Electricity", labels = c("Electricity", "Gas"))
+
+pge_commercial_chart
+#### end ####
+```
+
+```{r}
+#### Charting 2017 to present residential gas and electricity usage ####
+pge_residential_chart <-
+  pge_all_residential %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = DATE %>% factor(),
+      y = TOTALKBTU,
+      fill = CUSTOMERCLASS
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Time",
+    y = "kBtu",
+    title = "PG&E Residential Gas and Electricity Usage, 2017 to June 2021",
+    fill = "Gas or Electricity"
+  ) +
+    scale_x_discrete(guide = guide_axis(check.overlap = TRUE)
+  ) +
+    scale_fill_discrete(name = "Gas or Electricity", labels = c("Electricity", "Gas")
+  ) 
+
+pge_residential_chart
+#### end ####
+```
+
+Comparing the two graphs, it does seem like there could be an observable impact from the COVID-19 pandemic. For both the residential and commercial graphs, the total gas and electricity use seems to have a yearly pattern where usage is lowest in the summer and highest in the winter. 
+
+But, when looking at the period after March 2020, when the COVID-19 pandemic came to the United States, the commercial electricity usage seems lower in each month compared to previous years (for example, electricity usage in April 2020 seems lower than electricity usage in past Aprils). In contrast, residential gas and electricity usage seems to go up after COVID-19 came to the United States when compared to similar periods in past years. Since many workplaces and businesses shutdown after COVID-19 began or went into a state of reduced functionality, people were spending less time in commercial spaces and more time at home, which could be an explanation for this phenomenon. 
+
+I made charts looking specifically at 2019 and 2020 in order to more closely analyze this issue. I also added a black reference line at March 2020 to clearly show the before and after COVID-19.
+
+```{r}
+#### Charting 2019 and 2020 (COVID era) commercial gas and electricity production ####
+pge_all_commercial_COVID <- filter(pge_all_commercial, YEAR == "2020" | YEAR == "2019")
+                                   
+pge_commercial_chart_COVID <-
+  pge_all_commercial_COVID %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = DATE %>% factor(),
+      y = TOTALKBTU,
+      fill = CUSTOMERCLASS
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Time",
+    y = "kBtu",
+    title = "PG&E Commercial Gas and Electricity Usage, 2019 and 2020",
+    fill = "Gas or Electricity"
+  ) +
+    scale_x_discrete(guide = guide_axis(check.overlap = TRUE)
+  ) +
+    scale_fill_discrete(name = "Gas or Electricity", labels = c("Electricity", "Gas")
+  ) +
+geom_vline(
+  xintercept = "2020-03-01"
+)
+
+pge_commercial_chart_COVID
+#### end ####
+```
+
+```{r}
+#### Charting 2019 and 2020 (COVID era) residential gas and electricity production ####
+pge_all_residential_COVID <- filter(pge_all_residential, YEAR == "2020" | YEAR == "2019")
+                                   
+pge_all_residential_chart_COVID <-
+  pge_all_residential_COVID %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = DATE %>% factor(),
+      y = TOTALKBTU,
+      fill = CUSTOMERCLASS
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Time",
+    y = "kBtu",
+    title = "PG&E Residential Gas and Electricity Usage, 2019 and 2020",
+    fill = "Gas or Electricity"
+  ) +
+    scale_x_discrete(guide = guide_axis(check.overlap = TRUE)
+  ) +
+    scale_fill_discrete(name = "Gas or Electricity", labels = c("Electricity", "Gas")
+  ) +
+geom_vline(
+  xintercept = "2020-03-01"
+)
+
+pge_all_residential_chart_COVID
+
+
+#### end ####
+```
+
+These charts more clealry indicate the same pattern I thought I saw before. It does seem like after COVID-19 came to the United States, commercial utility use was lower than comparable times, but residential utility use was higher than comparable times. This continues to support my original hypothesis, that because during COVID-19 people were at home more and in commercial spaces less, utility use increased in residential spaces and decreased in commercial ones.
+
+By making these conclusions, I am assuming that COVID-19 impacted the amount of time people spent at home versus in commercial spaces. I have not actually looked at data that specifically shows that. I am also assuming that there is not some other possible causal mechanism that impacted utility use. For example, in theory maybe California passed more restrictive commercial electricity and gas usage legislation in 2020 that caused this dip.
+
+This data is provided by PG&E, an electricity and gas company. The company has a staked interest in how utility data is interpreted by the public, and may have somehow manipulated these figures for their own benefit. Additionally, the data only encapsulates Northern California, meaning it is difficult to make conclusions about larger COVID-19 utility use trends, as this focuses on one specific geographic area. 
